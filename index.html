@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SentinelAuth - Módulo de Ciberseguridad</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --accent-color: #0284c7;
+            --error-color: #ef4444;
+            --success-color: #22c55e;
+            --warning-color: #f59e0b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+        }
+
+        .login-card {
+            background-color: var(--card-bg);
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            border: 1px solid #334155;
+            margin-bottom: 1.5rem;
+        }
+
+        .login-card h2 {
+            margin-top: 0;
+            text-align: center;
+            color: var(--accent-color);
+        }
+
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 4px;
+            border: 1px solid #475569;
+            background-color: #0f172a;
+            color: #fff;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--accent-color);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .btn-submit:hover {
+            background-color: #0369a1;
+        }
+
+        .btn-submit:disabled {
+            background-color: #475569;
+            cursor: not-allowed;
+        }
+
+        .message-box {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            display: none;
+        }
+
+        .message-box.error {
+            background-color: rgba(239, 68, 68, 0.2);
+            border: 1px solid var(--error-color);
+            color: var(--error-color);
+            display: block;
+        }
+
+        .message-box.success {
+            background-color: rgba(34, 197, 94, 0.2);
+            border: 1px solid var(--success-color);
+            color: var(--success-color);
+            display: block;
+        }
+
+        /* Panel de Trazabilidad y Logs */
+        .log-card {
+            background-color: #090d16;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 1rem;
+            width: 100%;
+            box-sizing: border-box;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.75rem;
+        }
+
+        .log-card h4 {
+            margin: 0 0 0.5rem 0;
+            color: var(--accent-color);
+            font-family: sans-serif;
+        }
+
+        .log-output {
+            max-height: 150px;
+            overflow-y: auto;
+            color: #38bdf8;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .dashboard {
+            display: none;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="login-card">
+        <!-- SECCIÓN DE LOGIN -->
+        <div id="loginSection">
+            <h2>SentinelAuth v1.0</h2>
+            <form id="authForm">
+                <div class="form-group">
+                    <label for="username">Usuario / Correo Electrónico</label>
+                    <input type="text" id="username" name="username" autocomplete="off" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Contraseña</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" id="submitBtn" class="btn-submit">Iniciar Sesión</button>
+            </form>
+            <div id="feedbackMessage" class="message-box"></div>
+        </div>
+
+        <!-- SECCIÓN POST-AUTENTICACIÓN -->
+        <div id="dashboardSection" class="dashboard">
+            <h2 style="color: var(--success-color);">¡Acceso Concedido!</h2>
+            <p>Bienvenido al sistema seguro, <strong id="userDisplay"></strong>.</p>
+            <p style="font-size: 0.85rem; color: #94a3b8;">Sesión validada mediante políticas de ciberinteligencia.</p>
+            <button onclick="logout()" class="btn-submit" style="background-color: #475569; margin-top: 1rem;">Cerrar Sesión</button>
+        </div>
+    </div>
+
+    <!-- MONITOR DE TRAZABILIDAD Y LOGS (RÚBRICA: TRAZABILIDAD DE EVENTOS) -->
+    <div class="log-card">
+        <h4>[ Monitor de Trazabilidad de Eventos - SIEM Simulado ]</h4>
+        <div id="logConsole" class="log-output">Esperando eventos de inicio de sesión...</div>
+    </div>
+</div>
+
+<script>
+    let failedAttempts = 0;
+    const MAX_ATTEMPTS = 3;
+
+    document.getElementById('authForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        const usernameInput = document.getElementById('username').value.trim();
+        const passwordInput = document.getElementById('password').value;
+        const feedback = document.getElementById('feedbackMessage');
+        const submitBtn = document.getElementById('submitBtn');
+
+        feedback.className = 'message-box';
+        feedback.innerText = '';
+
+        // 1. Sanitización de entradas (Prevenir Injection/XSS)
+        const sanitizedUsername = usernameInput.replace(/[<>&'"]/g, '');
+
+        if (sanitizedUsername !== usernameInput) {
+            showFeedback('Caracteres no permitidos detectados.', 'error');
+            registerLog('XSS_ATTEMPT_DETECTED', 'Inyección de caracteres detectada en el usuario.');
+            registerFailedAttempt();
+            return;
+        }
+
+        // 2. Validación de Longitud
+        if (sanitizedUsername.length < 4) {
+            showFeedback('El usuario debe tener al menos 4 caracteres.', 'error');
+            registerLog('VALIDATION_FAILED', 'Longitud de usuario insuficiente.');
+            registerFailedAttempt();
+            return;
+        }
+
+        // 3. Reglas de Complejidad de Contraseña (OWASP)
+        // Mínimo 8 caracteres, 1 mayúscula, 1 número, 1 carácter especial
+        const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+        if (!passwordRegex.test(passwordInput)) {
+            showFeedback('La contraseña debe tener mínimo 8 caracteres, una mayúscula, un número y un símbolo (@$!%*?&).', 'error');
+            registerLog('WEAK_PASSWORD_REJECTED', 'La contraseña no cumple las políticas de complejidad.');
+            registerFailedAttempt();
+            return;
+        }
+
+        // 4. Autenticación Exitosa
+        failedAttempts = 0; // Reiniciar contador de fallos
+        registerLog('AUTH_SUCCESS', `Acceso autorizado para el usuario: ${sanitizedUsername}`);
+        
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('dashboardSection').style.display = 'block';
+        document.getElementById('userDisplay').innerText = sanitizedUsername;
+    });
+
+    function registerFailedAttempt() {
+        failedAttempts++;
+        if (failedAttempts >= MAX_ATTEMPTS) {
+            showFeedback('Bloqueo de seguridad: Se superó el límite de 3 intentos fallidos.', 'error');
+            document.getElementById('submitBtn').disabled = true;
+            registerLog('SECURITY_BLOCK', 'Formulario bloqueado por tasa excesiva de intentos fallidos.');
+        }
+    }
+
+    function showFeedback(message, type) {
+        const feedback = document.getElementById('feedbackMessage');
+        feedback.innerText = message;
+        feedback.classList.add(type);
+    }
+
+    function registerLog(eventType, detail) {
+        const logEntry = {
+            timestamp: new Date().toISOString(),
+            event: eventType,
+            details: detail,
+            ip_simulated: '192.168.1.45'
+        };
+
+        // Salida en Consola F12
+        console.log('[SECURITY LOG]:', JSON.stringify(logEntry, null, 2));
+
+        // Salida en Pantalla (Monitor SIEM)
+        const logConsole = document.getElementById('logConsole');
+        const formattedLog = `[${logEntry.timestamp.split('T')[1].slice(0, 8)}] [${logEntry.event}]: ${logEntry.details}\n`;
+        
+        if (logConsole.innerText.includes('Esperando eventos')) {
+            logConsole.innerText = formattedLog;
+        } else {
+            logConsole.innerText = formattedLog + logConsole.innerText;
+        }
+    }
+
+    function logout() {
+        document.getElementById('loginSection').style.display = 'block';
+        document.getElementById('dashboardSection').style.display = 'none';
+        document.getElementById('authForm').reset();
+        document.getElementById('submitBtn').disabled = false;
+        document.getElementById('feedbackMessage').className = 'message-box';
+        failedAttempts = 0;
+        registerLog('USER_LOGOUT', 'El usuario cerró la sesión activa.');
+    }
+</script>
+
+</body>
+</html>
